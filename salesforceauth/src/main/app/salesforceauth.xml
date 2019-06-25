@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="localhost" port="8081" doc:name="HTTP Listener Configuration"/>
+    <sfdc:config-with-oauth name="Salesforce__OAuth_v2_0" consumerKey="3MVG9YDQS5WtC11qiMvWvFhBRvXhL.ZxzP.uWntGsU7dtkS9rCNgtuyYj2mj4eyL4k.ZQMmkkLA==" consumerSecret="235794702379752280" doc:name="Salesforce: OAuth v2.0">
+        <sfdc:oauth-callback-config domain="localhost" localPort="8081" path="callback" remotePort="8081"/>
+    </sfdc:config-with-oauth>   
+ 
+    <flow name="authorize" >
+        <http:listener config-ref="HTTP_Listener_Configuration" path="authorize" doc:name="HTTP">
+            <http:response-builder statusCode="200" reasonPhrase="You have successfully authorized the connector. Your access token id is: #[flowVars.OAuthAccessTokenId]"/>
+            <http:error-response-builder statusCode="404" reasonPhrase="An error has occurred authorizing the connector"/>
+        </http:listener>
+        <sfdc:authorize config-ref="Salesforce__OAuth_v2_0" display="PAGE" doc:name="Salesforce"/>
+    </flow>
+    <flow name="sfdctestFlow1" >
+        <http:listener config-ref="HTTP_Listener_Configuration" path="run" doc:name="HTTP"/>
+        <sfdc:create config-ref="Salesforce__OAuth_v2_0" type="Contact" accessTokenId="#[flowVars.OAuthAccessTokenId]" doc:name="Salesforce">
+            <sfdc:objects ref="#[payload]"/>
+        </sfdc:create>
+    </flow>
+    <flow name="unauthorize" >
+        <http:listener config-ref="HTTP_Listener_Configuration" path="unauthorize" doc:name="HTTP">
+            <http:response-builder statusCode="200" reasonPhrase="You have successfully unauthorized the connector for #[message.inboundProperties.'http.query.params'.accessTokenId]"/>
+        </http:listener>     
+        <sfdc:unauthorize config-ref="Salesforce__OAuth_v2_0"
+            accessTokenId="#[message.inboundProperties.'http.query.params'.accessTokenId]" doc:name="Salesforce"/>
+    </flow>
+</mule>

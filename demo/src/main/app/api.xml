@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <http:listener-config name="api-httpListenerConfig" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <apikit:config name="api-config" raml="api.raml" consoleEnabled="false" doc:name="Router"/>
+    <flow name="api-main">
+        <http:listener config-ref="api-httpListenerConfig" path="/api/*" doc:name="HTTP"/>
+        <apikit:router config-ref="api-config" doc:name="APIkit Router"/>
+        <exception-strategy ref="api-apiKitGlobalExceptionMapping" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+    <flow name="get:/contact:api-config">
+        <set-payload value="{&#xA;  &quot;firstname&quot;:&quot;Albin&quot;,&#xA;  &quot;lastname&quot;:&quot;Kjellin&quot;,&#xA;  &quot;ssn&quot;:&quot;123456789&quot;&#xA;}" doc:name="Set Payload"/>
+    </flow>
+    <flow name="post:/contact:api-config">
+        <set-payload value="#[NullPayload.getInstance()]" doc:name="Set Payload"/>
+    </flow>
+    <flow name="post:/contact/{contactId}/datasheet:api-config">
+    <set-payload value="#[message.inboundAttachments]" doc:name="Retrieve Attachments"/>
+	<foreach doc:name="For Each">
+	<set-payload value="#[payload.getInputStream() ]" doc:name="Get Inputstream from Payload"/>
+	<file:outbound-endpoint path="src/test/resources/rest/attachment/out" responseTimeout="10000" doc:name="File" outputPattern="#[server.dateTime.toString()].xslx"/>
+	        </foreach>
+	        <set-payload value="{
+  &quot;status&quot;:&quot;success&quot;
+ }" doc:name="Set Payload"/>
+    </flow>
+    <flow name="post:/excel:api-config">
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <file:outbound-endpoint path="D:\Dev\mulesoft\" responseTimeout="10000" doc:name="File" />
+
+        <logger message="-----------Read the content------#[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message metadata:id="74fc2359-be73-475f-a800-71ab941497ee" doc:name="Transform Message">
+           <dw:input-payload doc:sample="sample_data\excel.xlsx">
+                             <!-- Boolean that defines if the first line in the data contains headers -->
+
+                                 <!-- Boolean that defines if empty lines are ignored -->
+
+                                 <!-- Defines that defines what cell to start reading from. In this case Column A is ignored, and all rows above 9 -->
+
+                         </dw:input-payload>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload map {
+	"Name" : "test",
+	"Place" : "test"
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <set-payload value="#[payload]" doc:name="Set Payload"/>
+    </flow>
+
+    <apikit:mapping-exception-strategy name="api-apiKitGlobalExceptionMapping">
+        <apikit:mapping statusCode="404">
+            <apikit:exception value="org.mule.module.apikit.exception.NotFoundException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Resource not found&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="405">
+            <apikit:exception value="org.mule.module.apikit.exception.MethodNotAllowedException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Method not allowed&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="415">
+            <apikit:exception value="org.mule.module.apikit.exception.UnsupportedMediaTypeException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Unsupported media type&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="406">
+            <apikit:exception value="org.mule.module.apikit.exception.NotAcceptableException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Not acceptable&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="400">
+            <apikit:exception value="org.mule.module.apikit.exception.BadRequestException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Bad request&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+    </apikit:mapping-exception-strategy>
+</mule>
